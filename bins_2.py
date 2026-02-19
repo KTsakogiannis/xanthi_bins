@@ -98,7 +98,7 @@ for b_type in selected_types:
 m_html += '</div>'
 st.write(m_html, unsafe_allow_html=True)
 
-# --- 5. MAIN INTERACTIVE MAP ---
+"""# --- 5. MAIN INTERACTIVE MAP ---
 c_lat = filtered_df['Lat'].mean() if not filtered_df.empty else df_full['Lat'].mean()
 c_lng = filtered_df['Lng'].mean() if not filtered_df.empty else df_full['Lng'].mean()
 
@@ -116,7 +116,59 @@ for (lat, lng), group in grouped:
         folium.CircleMarker([lat, lng], radius=6, color='white', weight=1, fill=True, 
                            fill_color=get_color(row['Type']), fill_opacity=0.9).add_to(main_map)
 
-map_output = st_folium(main_map, use_container_width=True, height=600, key="main_map")
+map_output = st_folium(main_map, use_container_width=True, height=600, key="main_map")"""
+
+# --- 5. MAIN INTERACTIVE MAP (SQUARE & DYNAMIC) ---
+c_lat = filtered_df['Lat'].mean() if not filtered_df.empty else df_full['Lat'].mean()
+c_lng = filtered_df['Lng'].mean() if not filtered_df.empty else df_full['Lng'].mean()
+
+main_map = folium.Map(location=[c_lat, c_lng], zoom_start=15, tiles="cartodbpositron")
+Draw(export=False, position='topleft', 
+     draw_options={'polyline': False, 'marker': False, 'circlemarker': False}).add_to(main_map)
+
+# Group bins by coordinates
+grouped = filtered_df.groupby(['Lat', 'Lng'])
+
+for (lat, lng), group in grouped:
+    if len(group) > 1:
+        # 1. GENERATE POPUP CONTENT FOR MULTI-POINTS
+        counts = group['Type'].value_counts()
+        popup_html = f"<div style='min-width: 120px;'><b>Multiple Bins:</b><br>"
+        for b_type, count in counts.items():
+            popup_html += f"• {b_type}: {count}<br>"
+        popup_html += "</div>"
+        
+        # 2. CREATE CLUSTER MARKER
+        icon_html = f'''
+            <div style="background-color:red; border:2px solid white; border-radius:50%; 
+                        width:26px; height:26px; display:flex; align-items:center; 
+                        justify-content:center; color:white; font-weight:bold; font-size:11px;">
+                {len(group)}
+            </div>'''
+        
+        folium.Marker(
+            [lat, lng], 
+            icon=folium.DivIcon(html=icon_html),
+            popup=folium.Popup(popup_html, max_width=200) # Added Clickable Popup
+        ).add_to(main_map)
+        
+    else:
+        # SINGLE BIN MARKER
+        row = group.iloc[0]
+        folium.CircleMarker(
+            [lat, lng], 
+            radius=7, 
+            color='white', 
+            weight=1, 
+            fill=True, 
+            fill_color=get_color(row['Type']), 
+            fill_opacity=0.9,
+            tooltip=f"Type: {row['Type']}" # Show type on hover
+        ).add_to(main_map)
+
+# Render map
+map_output = st_folium(main_map, use_container_width=True, key="main_map")
+
 
 # --- 6. SPATIAL ANALYSIS ---
 def calculate_area(geom):
