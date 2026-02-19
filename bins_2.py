@@ -98,7 +98,7 @@ for b_type in selected_types:
 m_html += '</div>'
 st.write(m_html, unsafe_allow_html=True)
 
-# --- 5. MAIN INTERACTIVE MAP (SQUARE & DYNAMIC) ---
+"""# --- 5. MAIN INTERACTIVE MAP (SQUARE & DYNAMIC) ---
 c_lat = filtered_df['Lat'].mean() if not filtered_df.empty else df_full['Lat'].mean()
 c_lng = filtered_df['Lng'].mean() if not filtered_df.empty else df_full['Lng'].mean()
 
@@ -147,7 +147,97 @@ for (lat, lng), group in grouped:
         ).add_to(main_map)
 
 # Render map
+map_output = st_folium(main_map, use_container_width=True, key="main_map")"""
+
+# --- 5. MAIN INTERACTIVE MAP (DYNAMIC PIE & CONDITIONAL POPUPS) ---
+c_lat = filtered_df['Lat'].mean() if not filtered_df.empty else df_full['Lat'].mean()
+c_lng = filtered_df['Lng'].mean() if not filtered_df.empty else df_full['Lng'].mean()
+
+main_map = folium.Map(location=[c_lat, c_lng], zoom_start=15, tiles="cartodbpositron")
+Draw(export=False, position='topleft', 
+     draw_options={'polyline': False, 'marker': False, 'circlemarker': False}).add_to(main_map)
+
+grouped = filtered_df.groupby(['Lat', 'Lng'])
+
+for (lat, lng), group in grouped:
+    unique_types = sorted(group['Type'].unique())
+    num_unique = len(unique_types)
+    total_bins = len(group)
+    
+    # CASE 1: MULTIPLE TYPES AT ONE SPOT (Pie Chart + Popup)
+    if num_unique > 1:
+        colors = [get_color(t) for t in unique_types]
+        step = 100 / num_unique
+        gradient_parts = [f"{color} {i*step}% {(i+1)*step}%" for i, color in enumerate(colors)]
+        gradient_str = ", ".join(gradient_parts)
+        
+        icon_html = f'''
+            <div style="
+                background: conic-gradient({gradient_str});
+                border: 2px solid white;
+                border-radius: 50%;
+                width: 32px; height: 32px;
+                display: flex; align-items: center; justify-content: center;
+                box-shadow: 0px 2px 5px rgba(0,0,0,0.4);
+                color: white; text-shadow: 1px 1px 2px black;
+                font-weight: bold; font-size: 12px;">
+                {total_bins}
+            </div>'''
+        
+        # Build the analysis breakdown for the popup
+        counts = group['Type'].value_counts()
+        popup_html = f"""
+            <div style='font-family: sans-serif; min-width: 140px;'>
+                <b style='color: #333;'>Point Analysis:</b><hr style='margin: 5px 0;'>
+                {"".join([f"• {t}: <b>{c}</b><br>" for t, c in counts.items()])}
+                <small style='color: #666;'>Total: {total_bins} bins</small>
+            </div>
+        """
+        
+        folium.Marker(
+            [lat, lng],
+            icon=folium.DivIcon(html=icon_html),
+            popup=folium.Popup(popup_html, max_width=250)
+        ).add_to(main_map)
+
+    # CASE 2: MULTIPLE BINS BUT ALL SAME TYPE (Solid Color, No Popup)
+    elif total_bins > 1:
+        bin_type = unique_types[0]
+        icon_html = f'''
+            <div style="
+                background-color: {get_color(bin_type)};
+                border: 2px solid white;
+                border-radius: 50%;
+                width: 28px; height: 28px;
+                display: flex; align-items: center; justify-content: center;
+                box-shadow: 0px 2px 4px rgba(0,0,0,0.3);
+                color: white; font-weight: bold; font-size: 11px;">
+                {total_bins}
+            </div>'''
+        
+        folium.Marker(
+            [lat, lng],
+            icon=folium.DivIcon(html=icon_html),
+            tooltip=f"{total_bins}x {bin_type} (Same Type)" # Hover only, no click popup
+        ).add_to(main_map)
+
+    # CASE 3: SINGLE BIN (Standard Circle)
+    else:
+        row = group.iloc[0]
+        folium.CircleMarker(
+            [lat, lng],
+            radius=8,
+            color='white',
+            weight=2,
+            fill=True,
+            fill_color=get_color(row['Type']),
+            fill_opacity=1,
+            tooltip=f"Type: {row['Type']}"
+        ).add_to(main_map)
+
+# Render
 map_output = st_folium(main_map, use_container_width=True, key="main_map")
+
 
 
 # --- 6. SPATIAL ANALYSIS ---
