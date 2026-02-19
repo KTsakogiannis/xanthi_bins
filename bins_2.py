@@ -98,26 +98,6 @@ for b_type in selected_types:
 m_html += '</div>'
 st.write(m_html, unsafe_allow_html=True)
 
-"""# --- 5. MAIN INTERACTIVE MAP ---
-c_lat = filtered_df['Lat'].mean() if not filtered_df.empty else df_full['Lat'].mean()
-c_lng = filtered_df['Lng'].mean() if not filtered_df.empty else df_full['Lng'].mean()
-
-main_map = folium.Map(location=[c_lat, c_lng], zoom_start=15, tiles="cartodbpositron")
-Draw(export=False, position='topleft', 
-     draw_options={'polyline': False, 'marker': False, 'circlemarker': False}).add_to(main_map)
-
-grouped = filtered_df.groupby(['Lat', 'Lng'])
-for (lat, lng), group in grouped:
-    if len(group) > 1:
-        icon_html = f'<div style="background-color:red; border:2px solid white; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; color:white; font-weight:bold; font-size:10px;">{len(group)}</div>'
-        folium.Marker([lat, lng], icon=folium.DivIcon(html=icon_html)).add_to(main_map)
-    else:
-        row = group.iloc[0]
-        folium.CircleMarker([lat, lng], radius=6, color='white', weight=1, fill=True, 
-                           fill_color=get_color(row['Type']), fill_opacity=0.9).add_to(main_map)
-
-map_output = st_folium(main_map, use_container_width=True, height=600, key="main_map")"""
-
 # --- 5. MAIN INTERACTIVE MAP (SQUARE & DYNAMIC) ---
 c_lat = filtered_df['Lat'].mean() if not filtered_df.empty else df_full['Lat'].mean()
 c_lng = filtered_df['Lng'].mean() if not filtered_df.empty else df_full['Lng'].mean()
