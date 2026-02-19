@@ -6,3 +6,5 @@ pyproj
 osmnx
 networkx
 scikit-learn
+altair<5.0.0
+streamlit>=1.20.0
