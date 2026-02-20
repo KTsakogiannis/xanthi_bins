@@ -125,7 +125,7 @@ for (lat, lng), group in grouped:
                 background: conic-gradient({gradient_str});
                 border: 2px solid white;
                 border-radius: 50%;
-                width: 24px; height: 24px;
+                width: {16 + (total_bins*4)}px; height: {16 + (total_bins*4)}px;
                 display: flex; align-items: center; justify-content: center;
                 box-shadow: 0px 2px 5px rgba(0,0,0,0.4);
                 color: white; text-shadow: 1px 1px 2px black;
