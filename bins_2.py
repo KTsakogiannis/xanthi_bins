@@ -125,7 +125,7 @@ for (lat, lng), group in grouped:
                 background: conic-gradient({gradient_str});
                 border: 2px solid white;
                 border-radius: 50%;
-                width: 32px; height: 32px;
+                width: 24px; height: 32px;
                 display: flex; align-items: center; justify-content: center;
                 box-shadow: 0px 2px 5px rgba(0,0,0,0.4);
                 color: white; text-shadow: 1px 1px 2px black;
@@ -157,7 +157,7 @@ for (lat, lng), group in grouped:
                 background-color: {get_color(bin_type)};
                 border: 2px solid white;
                 border-radius: 50%;
-                width: 28px; height: 28px;
+                width: 15px; height: 28px;
                 display: flex; align-items: center; justify-content: center;
                 box-shadow: 0px 2px 4px rgba(0,0,0,0.3);
                 color: white; font-weight: bold; font-size: 11px;">
