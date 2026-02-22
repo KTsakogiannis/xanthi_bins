@@ -59,7 +59,7 @@ if 'route_results' not in st.session_state:
 # --- 2. DATA LOADING ---
 @st.cache_data
 def load_data():
-    return pd.read_csv('ΠΕΡΙΞ_ΕΝΩΠΟΙΗΜΕΝΟ&ΞΑΝΘΗ1_2_3_4_5_6_7_8.csv')
+    return pd.read_csv('ΚΑΔΟΙ_ΞΑΝΘΗΣ.csv')
 
 df_full = load_data()
 
