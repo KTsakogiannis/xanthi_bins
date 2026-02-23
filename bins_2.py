@@ -50,7 +50,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🗑️ Bin Management: Collection Routes & Analysis")
+st.title("🚮 Bin Management: Collection Routes & Analysis")
 
 # Initialize session state for persistent data
 if 'route_results' not in st.session_state:
