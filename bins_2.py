@@ -102,7 +102,7 @@ st.write(m_html, unsafe_allow_html=True)
 c_lat = filtered_df['Lat'].mean() if not filtered_df.empty else df_full['Lat'].mean()
 c_lng = filtered_df['Lng'].mean() if not filtered_df.empty else df_full['Lng'].mean()
 
-main_map = folium.Map(location=[c_lat, c_lng], zoom_start=15, tiles="cartodbpositron")
+main_map = folium.Map(location=[c_lat, c_lng], zoom_start=15, tiles="cartodbpositron", attribution_control=False, control_scale=True)
 Draw(export=False, position='topleft', 
      draw_options={'polyline': False, 'marker': False, 'circlemarker': False}).add_to(main_map)
 
@@ -324,7 +324,7 @@ if map_output and map_output.get('all_drawings'):
                     
                     res = st.session_state.route_results[disp_type]
                     if res['length'] > 0:
-                        route_map = folium.Map(location=[sel_df['Lat'].mean(), sel_df['Lng'].mean()], zoom_start=16, tiles="cartodbpositron")
+                        route_map = folium.Map(location=[sel_df['Lat'].mean(), sel_df['Lng'].mean()], zoom_start=16, tiles="cartodbpositron", attribution_control=False, control_scale=True)
                         folium.PolyLine(res['path'], color=get_color(disp_type), weight=5, opacity=0.7).add_to(route_map)
                         
                         for idx, (lat, lng) in enumerate(res['stops']):
