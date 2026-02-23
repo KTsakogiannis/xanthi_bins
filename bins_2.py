@@ -4,7 +4,7 @@ import folium
 from streamlit_folium import st_folium
 from folium.plugins import Draw
 from shapely.geometry import Point, Polygon
-from shapely.ops import transform
+from shapely.ops import transform, unary_union
 import pyproj
 import math
 
@@ -65,16 +65,34 @@ df_full = load_data()
 
 # --- 3. SIDEBAR FILTERS ---
 st.sidebar.header("🗺️ Map Display Filters")
+
 all_types = sorted(df_full['Type'].unique().tolist())
 selected_types = st.sidebar.multiselect("Visible Bin Types", all_types, default=all_types)
 
 all_places = sorted(df_full['Place'].unique().tolist())
 selected_places = st.sidebar.multiselect("Neighbourhoods", all_places, default=all_places)
 
+st.sidebar.markdown("---")
+# Coverage visualization options
+
+show_coverage = st.sidebar.checkbox("Show Bin Coverage", value=False)
+coverage_bin_type = None
+coverage_radius = 50
+if show_coverage:
+    coverage_bin_type = st.sidebar.selectbox("Coverage Bin Type", all_types)
+    coverage_radius = st.sidebar.slider("Coverage Radius (meters)", min_value=20, max_value=500, value=50, step=5)
+
+
 filtered_df = df_full[
     df_full['Type'].isin(selected_types) & 
     df_full['Place'].isin(selected_places)
 ].copy()
+
+# Prepare deduplicated bins for coverage (by Lat, Lng, Type)
+coverage_bins_df = None
+if show_coverage and coverage_bin_type:
+    # Only bins of the selected type, drop duplicates by Lat/Lng/Type
+    coverage_bins_df = df_full[df_full['Type'] == coverage_bin_type].drop_duplicates(subset=['Lat', 'Lng', 'Type'])
 
 # --- 4. COLOR THEME & METRIC CARDS ---
 def get_color(bin_type):
@@ -102,9 +120,50 @@ st.write(m_html, unsafe_allow_html=True)
 c_lat = filtered_df['Lat'].mean() if not filtered_df.empty else df_full['Lat'].mean()
 c_lng = filtered_df['Lng'].mean() if not filtered_df.empty else df_full['Lng'].mean()
 
+
 main_map = folium.Map(location=[c_lat, c_lng], zoom_start=15, tiles="cartodbpositron", attribution_control=False, control_scale=True)
 Draw(export=False, position='topleft', 
      draw_options={'polyline': False, 'marker': False, 'circlemarker': False}).add_to(main_map)
+
+# --- COVERAGE VISUALIZATION ---
+if show_coverage and coverage_bin_type and coverage_bins_df is not None and not coverage_bins_df.empty:
+    # Project to meters for accurate buffering
+    proj_to_m = pyproj.Transformer.from_crs('EPSG:4326', 'EPSG:3857', always_xy=True).transform
+    proj_to_latlon = pyproj.Transformer.from_crs('EPSG:3857', 'EPSG:4326', always_xy=True).transform
+    # Create buffer (circle) for each bin in meters, then union
+    buffers = []
+    for _, row in coverage_bins_df.iterrows():
+        pt = Point(row['Lng'], row['Lat'])
+        pt_m = transform(proj_to_m, pt)
+        buf_m = pt_m.buffer(coverage_radius)
+        buffers.append(buf_m)
+    if buffers:
+        unioned = unary_union(buffers)
+        if hasattr(unioned, 'is_empty') and not unioned.is_empty:
+            # Convert back to lat/lon for folium
+            def to_latlon_coords(geom):
+                # Helper to convert (x, y) in meters to (lat, lng) for folium
+                def meter_to_latlng(x, y):
+                    lng, lat = proj_to_latlon(x, y)
+                    return (lat, lng)
+                if geom.geom_type == 'Polygon':
+                    return [[meter_to_latlng(x, y) for (x, y) in geom.exterior.coords]]
+                elif geom.geom_type == 'MultiPolygon':
+                    return [[meter_to_latlng(x, y) for (x, y) in poly.exterior.coords] for poly in geom.geoms]
+                else:
+                    return []
+            coords = to_latlon_coords(unioned)
+            if coords and all(len(poly) > 2 for poly in coords):
+                folium.Polygon(
+                    locations=coords,
+                    color=get_color(coverage_bin_type),
+                    fill=True,
+                    fill_color=get_color(coverage_bin_type),
+                    fill_opacity=0.18,
+                    weight=2,
+                    opacity=0.5,
+                    popup=f"Coverage: {coverage_bin_type} bin ({coverage_radius}m)"
+                ).add_to(main_map)
 
 grouped = filtered_df.groupby(['Lat', 'Lng'])
 
