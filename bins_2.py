@@ -125,7 +125,7 @@ for (lat, lng), group in grouped:
                 background: conic-gradient({gradient_str});
                 border: 2px solid white;
                 border-radius: 50%;
-                width: {16 + ((total_bins-1)*2)}px; height: {16 + ((total_bins-1)*2)}px;
+                width: {12 + ((total_bins-1)*2)}px; height: {12 + ((total_bins-1)*2)}px;
                 display: flex; align-items: center; justify-content: center;
                 box-shadow: 0px 2px 5px rgba(0,0,0,0.4);
                 color: white; text-shadow: 1px 1px 2px black;
@@ -157,7 +157,7 @@ for (lat, lng), group in grouped:
                 background-color: {get_color(bin_type)};
                 border: 2px solid white;
                 border-radius: 50%;
-                width: {16 + ((total_bins-1)*2)}px; height: {16 + ((total_bins-1)*2)}px;
+                width: {12 + ((total_bins-1)*2)}px; height: {12 + ((total_bins-1)*2)}px;
                 display: flex; align-items: center; justify-content: center;
                 box-shadow: 0px 2px 4px rgba(0,0,0,0.3);
                 color: white; font-weight: bold; font-size: 11px;">
@@ -175,7 +175,7 @@ for (lat, lng), group in grouped:
         row = group.iloc[0]
         folium.CircleMarker(
             [lat, lng],
-            radius=8,
+            radius=6,
             color='white',
             weight=2,
             fill=True,
