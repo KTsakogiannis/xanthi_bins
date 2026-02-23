@@ -57,11 +57,18 @@ if 'route_results' not in st.session_state:
     st.session_state.route_results = None
 
 # --- 2. DATA LOADING ---
-@st.cache_data
-def load_data():
-    return pd.read_csv('ΚΑΔΟΙ_ΞΑΝΘΗΣ.csv')
 
-df_full = load_data()
+# --- 2A. CHOOSE SOURCE POINTS FILE ---
+import os
+points_dir = './Points'
+point_files = [f for f in os.listdir(points_dir) if f.endswith('.csv') and not f.startswith('.~lock')]
+selected_points_file = st.sidebar.selectbox('Choose Source Points CSV', point_files)
+
+@st.cache_data
+def load_data(points_file):
+    return pd.read_csv(os.path.join(points_dir, points_file))
+
+df_full = load_data(selected_points_file)
 
 # --- 3. SIDEBAR FILTERS ---
 st.sidebar.header("🗺️ Map Display Filters")
@@ -248,17 +255,38 @@ map_output = st_folium(main_map, use_container_width=True, key="main_map")
 
 
 
+
 # --- 6. SPATIAL ANALYSIS ---
 def calculate_area(geom):
     proj = pyproj.Transformer.from_crs('EPSG:4326', 'EPSG:3857', always_xy=True).transform
     return transform(proj, geom).area / 1_000_000
 
-if map_output and map_output.get('all_drawings'):
+# Polygon selection from ./Polygons
+polygons_dir = './Polygons'
+polygon_files = [f for f in os.listdir(polygons_dir) if f.endswith('.txt') and not f.startswith('.')]
+polygon_option = st.sidebar.selectbox('Choose Polygon (optional)', ['Draw on Map'] + polygon_files)
+
+use_polygon_file = polygon_option != 'Draw on Map'
+polygon_geom = None
+if use_polygon_file:
+    with open(os.path.join(polygons_dir, polygon_option), 'r') as pf:
+        poly_line = pf.read().strip()
+    # Parse WKT POLYGON ((lng lat, ...))
+    import re
+    coords_str = re.search(r'POLYGON *\(\((.*)\)\)', poly_line)
+    if coords_str:
+        coords = [tuple(map(float, pt.split())) for pt in coords_str.group(1).split(',')]
+        polygon_geom = Polygon(coords)
+
+if use_polygon_file and polygon_geom is not None:
+    poly = polygon_geom
+    sel_df = df_full[df_full.apply(lambda r: poly.contains(Point(r['Lng'], r['Lat'])), axis=1)]
+    a_km2 = calculate_area(poly)
+elif map_output and map_output.get('all_drawings'):
     last = map_output['all_drawings'][-1]
     geom_type = last['geometry']['type']
     sel_df = []
     a_km2 = 0
-    
     if geom_type == 'Polygon':
         poly = Polygon(last['geometry']['coordinates'][0])
         sel_df = df_full[df_full.apply(lambda r: poly.contains(Point(r['Lng'], r['Lat'])), axis=1)]
@@ -273,24 +301,26 @@ if map_output and map_output.get('all_drawings'):
             a = math.sin(dp/2)**2 + math.cos(p1)*math.cos(p2)*math.sin(dl/2)**2
             return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
         sel_df = df_full[df_full.apply(lambda r: hv(center[1], center[0], r['Lat'], r['Lng']) <= rad, axis=1)]
+else:
+    sel_df = []
+    a_km2 = 0
 
-    if len(sel_df) > 0:
-        st.divider()
-        st.subheader("📊 Selected Area Analysis")
-        
-        col_table, col_empty = st.columns([1, 1])
-        with col_table:
-            st.write(f"**Density Table ({a_km2:.4f} km²)**")
-            d_rows = []
-            f_counts = sel_df['Type'].value_counts()
-            for t in sorted(df_full['Type'].unique()):
-                c = f_counts.get(t, 0)
-                d_rows.append({"Type": t, "Count": c, "Density (/km²)": round(c/a_km2, 2)})
-            st.table(pd.DataFrame(d_rows).set_index("Type"))
+if len(sel_df) > 0:
+    st.divider()
+    st.subheader("📊 Selected Area Analysis")
+    col_table, col_empty = st.columns([1, 1])
+    with col_table:
+        st.write(f"**Density Table ({a_km2:.4f} km²)**")
+        d_rows = []
+        f_counts = sel_df['Type'].value_counts()
+        for t in sorted(df_full['Type'].unique()):
+            c = f_counts.get(t, 0)
+            d_rows.append({"Type": t, "Count": c, "Density (/km²)": round(c/a_km2, 2)})
+        st.table(pd.DataFrame(d_rows).set_index("Type"))
 
-        if HAS_NETWORK_LIBS:
-            st.write("---")
-            col_l, col_r = st.columns(2)
+    if HAS_NETWORK_LIBS:
+        st.write("---")
+        col_l, col_r = st.columns(2)
 
             with col_l:
                 st.write("**🚶 Average Walkable Symmetric Matrix**")
