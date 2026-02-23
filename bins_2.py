@@ -322,7 +322,7 @@ if len(sel_df) > 0:
         st.write("---")
         col_l, col_r = st.columns(2)
 
-            with col_l:
+        with col_l:
                 st.write("**🚶 Average Walkable Symmetric Matrix**")
                 if st.button("Calculate Walkable Matrix"):
                     with st.spinner("Analyzing walking paths..."):
@@ -353,7 +353,7 @@ if len(sel_df) > 0:
                             w_matrix.append(row)
                         st.table(pd.DataFrame(w_matrix).set_index("Type"))
 
-            with col_r:
+        with col_r:
                 st.write("**🚛 Shortest Collection Routes (TSP)**")
                 if st.button("Calculate All Optimal Routes"):
                     with st.spinner("Calculating road-legal routes for all bin types..."):
