@@ -290,7 +290,7 @@ if map_output and map_output.get('all_drawings'):
                                     except: continue
                                 
                                 if len(tsp_g.nodes) > 1:
-                                    tsp_nodes = nx.approximation.traveling_salesman_problem(tsp_g, weight='weight', cycle=True)
+                                    tsp_nodes = nx.approximation.traveling_salesman_problem(tsp_g, weight='weight', cycle=False)
                                     full_coords = []
                                     total_m = 0
                                     for i in range(len(tsp_nodes)-1):
