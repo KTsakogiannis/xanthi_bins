@@ -280,6 +280,17 @@ if use_polygon_file:
 
 if use_polygon_file and polygon_geom is not None:
     poly = polygon_geom
+    # Show the polygon on the map
+    folium.Polygon(
+        locations=[(lat, lng) for lng, lat in poly.exterior.coords],
+        color="#3388ff",
+        fill=True,
+        fill_color="#3388ff",
+        fill_opacity=0.18,
+        weight=2,
+        opacity=0.5,
+        popup=f"Selected Polygon: {polygon_option}"
+    ).add_to(main_map)
     sel_df = df_full[df_full.apply(lambda r: poly.contains(Point(r['Lng'], r['Lat'])), axis=1)]
     a_km2 = calculate_area(poly)
 elif map_output and map_output.get('all_drawings'):
@@ -318,108 +329,33 @@ if len(sel_df) > 0:
             d_rows.append({"Type": t, "Count": c, "Density (/km²)": round(c/a_km2, 2)})
         st.table(pd.DataFrame(d_rows).set_index("Type"))
 
-    if HAS_NETWORK_LIBS:
-        st.write("---")
-        col_l, col_r = st.columns(2)
-
-        with col_l:
-                st.write("**🚶 Average Walkable Symmetric Matrix**")
-                if st.button("Calculate Walkable Matrix"):
-                    with st.spinner("Analyzing walking paths..."):
-                        G_w = ox.graph_from_point((sel_df['Lat'].mean(), sel_df['Lng'].mean()), dist=1000, network_type='walk')
-                        clean_w = sel_df.drop_duplicates(subset=['Lat', 'Lng', 'Type']).copy()
-                        clean_w['node'] = ox.distance.nearest_nodes(G_w, X=clean_w['Lng'], Y=clean_w['Lat'])
-                        u_types = sorted(clean_w['Type'].unique())
-                        raw_dists = {}
-                        for t1 in u_types:
-                            for t2 in u_types:
-                                n_f, n_t = clean_w[clean_w['Type'] == t1]['node'].unique(), clean_w[clean_w['Type'] == t2]['node'].unique()
-                                paths = []
-                                for s in n_f:
-                                    tgs = [n for n in n_t if n != s]
-                                    if tgs:
-                                        try:
-                                            d_d = nx.single_source_dijkstra_path_length(G_w, s, weight='length')
-                                            v = [d_d[t] for t in tgs if t in d_d]
-                                            if v: paths.append(min(v))
-                                        except: continue
-                                raw_dists[(t1, t2)] = paths
-                        w_matrix = []
-                        for t1 in u_types:
-                            row = {"Type": t1}
-                            for t2 in u_types:
-                                comb = raw_dists.get((t1, t2), []) + raw_dists.get((t2, t1), [])
-                                row[t2] = f"{int(sum(comb)/len(comb))}m" if comb else "-"
-                            w_matrix.append(row)
-                        st.table(pd.DataFrame(w_matrix).set_index("Type"))
-
-        with col_r:
-                st.write("**🚛 Shortest Collection Routes (TSP)**")
-                if st.button("Calculate All Optimal Routes"):
-                    with st.spinner("Calculating road-legal routes for all bin types..."):
-                        try:
-                            G_d = ox.graph_from_point((sel_df['Lat'].mean(), sel_df['Lng'].mean()), dist=1200, network_type='drive')
-                            u_types = sorted(sel_df['Type'].unique())
-                            all_results = {}
-
-                            for t in u_types:
-                                t_bins = sel_df[sel_df['Type'] == t].drop_duplicates(subset=['Lat', 'Lng'])
-                                if len(t_bins) < 2:
-                                    all_results[t] = {"length": 0, "path": [], "stops": []}
-                                    continue
-                                
-                                nodes = ox.distance.nearest_nodes(G_d, X=t_bins['Lng'], Y=t_bins['Lat'])
-                                unique_nodes = list(dict.fromkeys(nodes))
-                                tsp_g = nx.Graph()
-                                for i, n1 in enumerate(unique_nodes):
-                                    try:
-                                        lengths = nx.single_source_dijkstra_path_length(G_d, n1, weight='length')
-                                        for j, n2 in enumerate(unique_nodes):
-                                            if i < j and n2 in lengths: tsp_g.add_edge(n1, n2, weight=lengths[n2])
-                                    except: continue
-                                
-                                if len(tsp_g.nodes) > 1:
-                                    tsp_nodes = nx.approximation.traveling_salesman_problem(tsp_g, weight='weight', cycle=False)
-                                    full_coords = []
-                                    total_m = 0
-                                    for i in range(len(tsp_nodes)-1):
-                                        u, v = tsp_nodes[i], tsp_nodes[i+1]
-                                        path = nx.shortest_path(G_d, u, v, weight='length')
-                                        total_m += nx.path_weight(G_d, path, weight='length')
-                                        for node in path: full_coords.append((G_d.nodes[node]['y'], G_d.nodes[node]['x']))
-                                    
-                                    # Identify stop sequence
-                                    seen = set()
-                                    stops = []
-                                    for node in tsp_nodes:
-                                        if node in unique_nodes and node not in seen:
-                                            stops.append((G_d.nodes[node]['y'], G_d.nodes[node]['x']))
-                                            seen.add(node)
-                                    
-                                    all_results[t] = {"length": int(total_m), "path": full_coords, "stops": stops}
-                            
-                            st.session_state.route_results = all_results
-                        except Exception as e:
-                            st.error(f"Routing error: {e}")
-
-                # Display Results if calculated
-                if st.session_state.route_results:
-                    summary = [{"Bin Type": t, "Route Length": f"{data['length']}m"} for t, data in st.session_state.route_results.items()]
-                    st.table(pd.DataFrame(summary).set_index("Bin Type"))
-                    
-                    st.write("---")
-                    st.subheader("🗺️ Route Sequence Visualizer")
-                    disp_type = st.selectbox("Select Route to Display", list(st.session_state.route_results.keys()))
-                    
-                    res = st.session_state.route_results[disp_type]
-                    if res['length'] > 0:
-                        route_map = folium.Map(location=[sel_df['Lat'].mean(), sel_df['Lng'].mean()], zoom_start=16, tiles="OpenStreetMap", attribution_control=False, control_scale=True)
-                        folium.PolyLine(res['path'], color=get_color(disp_type), weight=5, opacity=0.7).add_to(route_map)
-                        
-                        for idx, (lat, lng) in enumerate(res['stops']):
-                            num_icon = f'<div style="background-color:{get_color(disp_type)}; color:white; border:2px solid white; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:11px;">{idx+1}</div>'
-                            folium.Marker([lat, lng], icon=folium.DivIcon(html=num_icon), tooltip=f"Stop {idx+1}").add_to(route_map)
-                        
-                        st_folium(route_map, width=1400, height=500, key="route_viewer")
-                    else:
-                        st.info("Not enough bins of this type for a route.")
+    if HAS_NETWORK_LIBS and len(sel_df) > 0:
+        st.write("**🚶 Average Walkable Symmetric Matrix**")
+        with st.spinner("Analyzing walking paths..."):
+            G_w = ox.graph_from_point((sel_df['Lat'].mean(), sel_df['Lng'].mean()), dist=1000, network_type='walk')
+            clean_w = sel_df.drop_duplicates(subset=['Lat', 'Lng', 'Type']).copy()
+            clean_w['node'] = ox.distance.nearest_nodes(G_w, X=clean_w['Lng'], Y=clean_w['Lat'])
+            u_types = sorted(clean_w['Type'].unique())
+            raw_dists = {}
+            for t1 in u_types:
+                for t2 in u_types:
+                    n_f = clean_w[clean_w['Type'] == t1]['node'].unique()
+                    n_t = clean_w[clean_w['Type'] == t2]['node'].unique()
+                    paths = []
+                    for s in n_f:
+                        tgs = [n for n in n_t if n != s]
+                        if tgs:
+                            try:
+                                d_d = nx.single_source_dijkstra_path_length(G_w, s, weight='length')
+                                v = [d_d[t] for t in tgs if t in d_d]
+                                if v: paths.append(min(v))
+                            except: continue
+                    raw_dists[(t1, t2)] = paths
+            w_matrix = []
+            for t1 in u_types:
+                row = {"Type": t1}
+                for t2 in u_types:
+                    comb = raw_dists.get((t1, t2), []) + raw_dists.get((t2, t1), [])
+                    row[t2] = f"{int(sum(comb)/len(comb))}m" if comb else "-"
+                w_matrix.append(row)
+            st.table(pd.DataFrame(w_matrix).set_index("Type"))
